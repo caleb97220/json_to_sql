@@ -1,0 +1,176 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON & JSONL to SQL Tool</title>
+    <script src="https://cdn.jsdelivr.net/npm/alasql@4"></script>
+    <style>
+
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI" , Roboto, sans-serif; margin: 30px; background: #f5f7fb; color: #333; }
+        textarea { width: 100%; height: 150px; font-family: monospace; border: 1px solid #ccd4e0; border-radius: 4px; padding: 10px;
+        box-sizing: border-box; }
+        .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 15px; }
+        .card {background: white; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e1e6ef;}
+        #sqlInput { width: 100%; height: 60px; font-family: monospace; font-size: 14px; }
+        button {background: #0066cc; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;}
+        button:hover {background: #0052a3}
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #ccd4e0; padding: 8px 12px; text-align: left; font-size: 13px; } th {background: #f0f4f8; font-weight: 600; }
+        .key-badge { display: inline-block; background: #e6fefa; color: #0066cc; padding: 3px 8px; border-radius: 12px; margin: 3px; font-size: 12px; font-family:  monospace;}
+    </style>
+</head>
+<body>
+<h2> JSON & JSONL to SQL Tool</h2>
+
+
+<p style="color: #666;">Paste raw JSON/JSONL text or upload a file to query it natively using standard SQL table naming.</p> 
+<div class="card">
+    <label style="font-weight: bold;">1. Input JSON / JSONL Data</label><br><br>
+    <input type="file" id="filePicker" accept=".json,.jsonl" style="margin-bottom: 10px; "> <br>
+    <textarea id="jsonInput" placeholder="Paste raw array, object dictionary, on JSONLrows here..."></textarea>
+    <button onclick="processJSON()" style="margin-top: 10px;">Parse & Register Table</button>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h3 style="margin-top: 0;">Available Fields (Table: data) </h3>
+        <div id="keyList">Upload/Paste JSON to discover columns...</div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0;"> Write SQL Query </h3>
+        <textarea id="sqlInput"> SELECT * FROM data WHERE 1=1 LIMIT 100</textarea>
+        <button onclick="runQuery()" style="margin-top: 10px; background:#2b9348;">Run Query</button>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px; "> 
+    <h3 style="margin-top:0;"> Output Results</h3>
+    <div style="overflow-x: auto;" id="tableOutput">No query executed yet.</div>
+    </div>
+
+<script>
+    // Parse JSON/JSONL and bind it directly to an in-memory table named "data'
+    function processJSON() {
+        let rawText = document.getElementById('jsonInput').value
+            .replace(/\u00A0/g, ' ') // Remove non-breaking spaces
+            .trim();
+
+        if (!rawText) {
+            alert("Please paste or upload some data first."); 
+            return;
+        }
+
+        let parsedRows = [];
+
+        try {
+            // STRATEGY: First try parsing as standard JSON
+            try {
+                let data = JSON.parse(rawText);
+                
+                // Handle custom dictionary/nested structures if present
+                if (data.featureInfo && typeof data.featureInfo === 'object' && !Array.isArray(data.featureInfo)) {
+                    parsedRows = Object.values(data.featureInfo);
+                } else {
+                    parsedRows = Array.isArray(data) ? data : [data];
+                }
+            } catch (jsonErr) {
+                // FALLBACK: If standard JSON fails, try parsing as JSON Lines (JSONL)
+                parsedRows = rawText.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0 && !line.startsWith('//'))
+                    .map(line => JSON.parse(line));
+            }
+
+            if (parsedRows.length === 0) {
+                alert("No valid records found in data.");
+                return;
+            }
+
+            // Register table into AlaSQL
+            alasql.tables.data = { data: parsedRows };
+
+            // Discover unique keys for badges
+            let keys = new Set(); 
+            parsedRows.forEach(row => {
+                if (row && typeof row === 'object') {
+                    Object.keys(row).forEach(k => keys.add(k));
+                }
+            });
+
+            const keyListDiv = document.getElementById('keyList'); 
+            keyListDiv.innerHTML = '';
+            keys.forEach(key => {
+                keyListDiv.innerHTML += `<span class="key-badge">${key}</span>`;
+            });
+
+            // Set query default
+            if (keys.has('srcCounterName')) {
+                document.getElementById('sqlInput').value = "SELECT srcCounterName, coefficient \nFROM data \nORDER BY ABS(coefficient) DESC";
+            } else {
+                document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
+            }
+
+            alert(`Successfully registered table 'data' with ${parsedRows.length} rows!`); 
+
+        } catch (err) {
+            console.error("Parsing error detail:", err);
+            alert("Parsing failed. Check that your text is valid JSON or JSONL format.");
+        }
+    }
+    // Run the custom query string written by the user
+    function runQuery() {
+        if (!alasql.tables.data) {
+            alert ("Please parse and register your JSON data first."); 
+            return;
+        }
+        const sql = document.getElementById('sqlInput').value;
+        try {
+            // Execute directly against the internal tables environment
+            const result = alasql(sql); 
+            renderTable(result);
+        } catch (err) {
+            document.getElementById("tableOutput").innerHTML = `<span style="color: red; font-weight: bold;">SQL Error: ${err.message}</span>`;
+        }
+    }
+
+
+    // Generate data grid layout
+    function renderTable(data) {
+        const container = document.getElementById('tableOutput');
+        if (!data || data.length === 0) {
+            container.innerHTML = "Query returned 0 rows."; 
+            return;
+        }
+
+        let headers = Object.keys(data[0]); 
+        let html = `<table><thead><tr>`;
+        headers.forEach(h => html += `<th>${h}</th>`);
+        html += `</tr></thead><tbody>`;
+
+        data.forEach(row => {
+            html += '<tr>';
+            headers.forEach(h => {
+                let val = row[h];
+                html += `<td>${val !== null && typeof val === "object" ? JSON.stringify(val) :  (val ?? '')}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += `</tbody></table>`;
+        container.innerHTML = html; }
+
+
+        // Handle File Pickers
+        document.getElementById('filePicker').addEventListener('change', function(e) {
+            const reader = new FileReader ();
+            reader.onload = function(event) {
+            document.getElementById('jsonInput').value = event.target.result;
+            processJSON();
+        };
+
+    reader.readAsText(e.target.files[0]);
+    });
+    </script>
+</body>
+</html>
