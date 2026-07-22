@@ -122,11 +122,18 @@
 
 
             } catch (jsonErr) {
+                
                 // FALLBACK: If standard JSON fails, try parsing as JSON Lines (JSONL)
                 parsedRows = rawText.split('\n')
-                    .map(line => line.trim())
-                    .filter(line => line.length > 0 && !line.startsWith('//'))
-                    .map(line => JSON.parse(line));
+                    .map((line, idx) => ({ line, num: idx + 1 }))
+                    .filter(({line}) => line.trim().length > 0 && !line.trim().startsWith('//'))
+                    .map(({line, num}) => {
+                        try {
+                            return JSON.parse(line);
+                        } catch (e) {
+                            throw new Error(`Line ${num}: ${e.message} — content: "${line.slice(0, 50)}..."`);
+                        }
+                    });
             }
 
             if (parsedRows.length === 0) {
@@ -144,6 +151,7 @@
                     Object.keys(row).forEach(k => keys.add(k));
                 }
             });
+            knownColumns = Array.from(keys);
 
             const keyListDiv = document.getElementById('keyList'); 
             keyListDiv.innerHTML = '';
@@ -157,10 +165,27 @@
 
         } catch (err) {
             console.error("Parsing error detail:", err);
-            alert("Parsing failed. Check that your text is valid JSON or JSONL format.");
+            alert("Parsing failed." + "\n" + describeJSONError(err, rawText));
         }
     }
+
+    function getLineAndColumn(text, position) {
+        const lines = text.slice(0, position).split('\n');
+        return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+    }
+
+    function describeJSONError(err, rawText) {
+        const match = err.message.match(/position (\d+)/);
+        if (match) {
+            const pos = parseInt(match[1]);
+            const { line, column } = getLineAndColumn(rawText, pos);
+            return `JSON error near line ${line}, column ${column}: ${err.message}`;
+        }
+        return err.message; // fallback if browser doesn't include position
+    }
+
     let lastResult = null;
+    let knownColumns = [];
     // Run the custom query string written by the user
     function runQuery() {
         if (!alasql.tables.data) {
@@ -171,6 +196,15 @@
         try {
             // Execute directly against the internal tables environment
             const result = alasql(sql); 
+            // check for selected columns that don't exist in the known schema
+            if (result.length > 0) {
+                const usedColumns = Object.keys(result[0]);
+                const unknown = usedColumns.filter(c => !knownColumns.includes(c));
+                if (unknown.length > 0) {
+                    alert(`Warning: The following columns were selected in your query but do not exist in the registered data: ${unknown.join(', ')}`); 
+                    return;
+                }
+            }
             lastResult = result;
             renderTable(result);
             document.getElementById('downloadBtn').style.display = result.length ? 'inline-block' : 'none';
