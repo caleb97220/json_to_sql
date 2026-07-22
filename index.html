@@ -28,6 +28,17 @@
         
         /* key badges are the style for displaying column names (small teal oval with blue text) */
         .key-badge { display: inline-block; background: #e6fefa; color: #0066cc; padding: 3px 8px; border-radius: 12px; margin: 3px; font-size: 12px; font-family:  monospace;}
+            
+        .toast {
+            padding: 12px 18px; border-radius: 6px; margin-bottom: 10px;
+            color: white; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            animation: slideIn 0.5s ease-out;
+        }
+        .toast.success { background: #2b9348; }
+        .toast.error { background: #d64545; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+            
+    
     </style>
     
     <!-- Google tag (gtag.js) this is for google analytics-->
@@ -42,7 +53,7 @@
 </head>
 <body>
 <h2> JSON & JSONL to SQL Tool</h2>
-
+<div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 1000;"></div>
 
 <p style= "color: #666;">Paste raw JSON/JSONL text or upload a file to query it natively using standard SQL table naming.</p> 
 <div class="card">
@@ -81,7 +92,7 @@
             .trim();
 
         if (!rawText) {
-            alert("Please paste or upload some data first."); 
+            showToast('Please paste or upload some data first.', 'error');
             return;
         }
 
@@ -122,22 +133,15 @@
 
 
             } catch (jsonErr) {
-                
                 // FALLBACK: If standard JSON fails, try parsing as JSON Lines (JSONL)
                 parsedRows = rawText.split('\n')
-                    .map((line, idx) => ({ line, num: idx + 1 }))
-                    .filter(({line}) => line.trim().length > 0 && !line.trim().startsWith('//'))
-                    .map(({line, num}) => {
-                        try {
-                            return JSON.parse(line);
-                        } catch (e) {
-                            throw new Error(`Line ${num}: ${e.message} — content: "${line.slice(0, 50)}..."`);
-                        }
-                    });
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0 && !line.startsWith('//'))
+                    .map(line => JSON.parse(line));
             }
 
             if (parsedRows.length === 0) {
-                alert("No valid records found in data.");
+                showToast("No valid records found in data.", 'error');
                 return;
             }
 
@@ -161,50 +165,26 @@
 
             document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
 
-            alert(`Successfully registered table 'data' with ${parsedRows.length} rows!`); 
+            showToast(`Successfully registered table 'data' with ${parsedRows.length} rows!`, 'success');
 
         } catch (err) {
             console.error("Parsing error detail:", err);
-            alert("Parsing failed." + "\n" + describeJSONError(err, rawText));
+            showToast("Parsing failed. Please validate your input.", 'error');
         }
     }
 
-    function getLineAndColumn(text, position) {
-        const lines = text.slice(0, position).split('\n');
-        return { line: lines.length, column: lines[lines.length - 1].length + 1 };
-    }
-
-    function describeJSONError(err, rawText) {
-        const match = err.message.match(/position (\d+)/);
-        if (match) {
-            const pos = parseInt(match[1]);
-            const { line, column } = getLineAndColumn(rawText, pos);
-            return `JSON error near line ${line}, column ${column}: ${err.message}`;
-        }
-        return err.message; // fallback if browser doesn't include position
-    }
 
     let lastResult = null;
-    let knownColumns = [];
     // Run the custom query string written by the user
     function runQuery() {
         if (!alasql.tables.data) {
-            alert ("Please parse and register your JSON data first."); 
+            showToast("Please parse and register your JSON data first.", 'error'); 
             return;
         }
         const sql = document.getElementById('sqlInput').value;
         try {
             // Execute directly against the internal tables environment
-            const result = alasql(sql); 
-            // check for selected columns that don't exist in the known schema
-            if (result.length > 0) {
-                const usedColumns = Object.keys(result[0]);
-                const unknown = usedColumns.filter(c => !knownColumns.includes(c));
-                if (unknown.length > 0) {
-                    alert(`Warning: The following columns were selected in your query but do not exist in the registered data: ${unknown.join(', ')}`); 
-                    return;
-                }
-            }
+            const result = alasql(sql);             
             lastResult = result;
             renderTable(result);
             document.getElementById('downloadBtn').style.display = result.length ? 'inline-block' : 'none';
@@ -217,12 +197,17 @@
     function downloadCSV() {
         if (!lastResult || lastResult.length === 0) return;
 
-        const headers = Object.keys(lastResult[0]);
-        const rows = lastResult.map(row =>
-            headers.map(h => escapeCSVValue(row[h])).join(',')
-        );
-        const csvContent = [headers.join(','), ...rows].join('\n');
+        const headerSet = new Set();
+        lastResult.forEach(row => {
+            Object.keys(row).forEach(key => headerSet.add(key));
+        });
 
+        const headers = Array.from(headerSet);
+        const rows = lastResult.map(row =>
+            headers.map(h => escapeCSVValue(row[h] !== undefined ? row[h] : '')).join(',')
+        );
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -265,6 +250,15 @@
         });
         html += `</tbody></table>`;
         container.innerHTML = html; }
+
+        function showToast(message, type = 'success', duration = 4000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), duration);
+        }
 
 
         // Handle File Pickers
