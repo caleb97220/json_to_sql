@@ -3,6 +3,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="Paste or upload JSON and JSONL files to easily query your data using SQL. Instantly auto-detect columns, run powerful queries, and download results as CSV">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>JSON & JSONL to SQL Tool</title>
     <script src="https://cdn.jsdelivr.net/npm/alasql@4"></script>
     <style>
@@ -52,7 +55,7 @@
         </script>
 </head>
 <body>
-<h2> JSON & JSONL to SQL Tool</h2>
+<h1> Query JSON & JSONL Files with SQL!</h1>
 <div id="toastContainer" style="position: fixed; top: 20px; right: 20px; z-index: 1000;"></div>
 
 <p style= "color: #666;">Paste raw JSON/JSONL text or upload a file to query it natively using standard SQL table naming.</p> 
@@ -155,7 +158,6 @@
                     Object.keys(row).forEach(k => keys.add(k));
                 }
             });
-            knownColumns = Array.from(keys);
 
             const keyListDiv = document.getElementById('keyList'); 
             keyListDiv.innerHTML = '';
@@ -170,7 +172,12 @@
         } catch (err) {
             console.error("Parsing error detail:", err);
             showToast("Parsing failed. Please validate your input.", 'error');
+            delete alasql.tables.data;   // so runQuery's guard correctly blocks
+            document.getElementById('keyList').innerHTML = 'Upload/Paste JSON to discover columns...';
         }
+        document.getElementById('tableOutput').innerHTML = 'No query executed yet.';
+        lastResult = null;
+        document.getElementById('downloadBtn').style.display = 'none';
     }
 
 
@@ -191,6 +198,8 @@
 
         } catch (err) {
             document.getElementById("tableOutput").innerHTML = `<span style="color: red; font-weight: bold;">SQL Error: ${err.message}</span>`;
+        lastResult = null;
+        document.getElementById('downloadBtn').style.display = 'none';
         }
     }
 
@@ -219,7 +228,7 @@
 
     function escapeCSVValue(val) {
         if (val === null || val === undefined) return '';
-        const str = String(val);
+        const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
         if (str.includes('"') || str.includes(',') || str.includes('\n')) {
             return `"${str.replace(/"/g, '""')}"`;
         }
@@ -236,7 +245,7 @@
         }
 
         const headerSet = new Set();
-        lastResult.forEach(row => {
+        data.forEach(row => {
             Object.keys(row).forEach(key => headerSet.add(key));
         });
 
