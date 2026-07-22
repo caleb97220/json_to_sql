@@ -235,7 +235,12 @@
             return;
         }
 
-        let headers = Object.keys(data[0]); 
+        const headerSet = new Set();
+        lastResult.forEach(row => {
+            Object.keys(row).forEach(key => headerSet.add(key));
+        });
+
+        const headers = Array.from(headerSet);
         let html = `<table><thead><tr>`;
         headers.forEach(h => html += `<th>${h}</th>`);
         html += `</tr></thead><tbody>`;
