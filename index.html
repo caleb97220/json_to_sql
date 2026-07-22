@@ -64,6 +64,7 @@
         <h3 style="margin-top:0;"> Write SQL Query </h3>
         <textarea id="sqlInput"> SELECT * FROM data WHERE 1=1 LIMIT 100</textarea>
         <button onclick="runQuery()" style="margin-top: 10px; background:#2b9348;">Run Query</button>
+        <button onclick="downloadCSV()"id="downloadBtn" style="display:none">Download CSV</button>
     </div>
 </div>
 
@@ -150,12 +151,6 @@
                 keyListDiv.innerHTML += `<span class="key-badge">${key}</span>`;
             });
 
-            // Set query default
-            // if (keys.has('srcCounterName')) {
-            //     document.getElementById('sqlInput').value = "SELECT srcCounterName, coefficient \nFROM data \nORDER BY ABS(coefficient) DESC";
-            // } else {
-            //     document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
-            // }
             document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
 
             alert(`Successfully registered table 'data' with ${parsedRows.length} rows!`); 
@@ -165,6 +160,7 @@
             alert("Parsing failed. Check that your text is valid JSON or JSONL format.");
         }
     }
+    let lastResult = null;
     // Run the custom query string written by the user
     function runQuery() {
         if (!alasql.tables.data) {
@@ -175,10 +171,40 @@
         try {
             // Execute directly against the internal tables environment
             const result = alasql(sql); 
+            lastResult = result;
             renderTable(result);
+            document.getElementById('downloadBtn').style.display = result.length ? 'inline-block' : 'none';
+
         } catch (err) {
             document.getElementById("tableOutput").innerHTML = `<span style="color: red; font-weight: bold;">SQL Error: ${err.message}</span>`;
         }
+    }
+
+    function downloadCSV() {
+        if (!lastResult || lastResult.length === 0) return;
+
+        const headers = Object.keys(lastResult[0]);
+        const rows = lastResult.map(row =>
+            headers.map(h => escapeCSVValue(row[h])).join(',')
+        );
+        const csvContent = [headers.join(','), ...rows].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'query_results.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function escapeCSVValue(val) {
+        if (val === null || val === undefined) return '';
+        const str = String(val);
+        if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
     }
 
 
