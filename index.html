@@ -10,16 +10,27 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI" , Roboto, sans-serif; margin: 30px; background: #f5f7fb; color: #333; }
         textarea { width: 100%; height: 150px; font-family: monospace; border: 1px solid #ccd4e0; border-radius: 4px; padding: 10px;
         box-sizing: border-box; }
+        /* this grid creates 2 columns, with the second twice as wide as the first. */
         .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; margin-top: 15px; }
+
+        /* card contains style used in the columns and output section */
         .card {background: white; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e1e6ef;}
+        
+        /* # notation is for IDs whereas . notation is for classes. IDs can only be used once per page but are useful due to document.getElementById('id') function*/
         #sqlInput { width: 100%; height: 60px; font-family: monospace; font-size: 14px; }
+        
+        /* button and table are types. they target every <button> and <table> on the page. buttons and pages can additionally have a class and an id */
+        /* in the case of conflicting styles, ID is highest priority, followed by classes, then types */
         button {background: #0066cc; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold;}
         button:hover {background: #0052a3}
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
         th, td { border: 1px solid #ccd4e0; padding: 8px 12px; text-align: left; font-size: 13px; } th {background: #f0f4f8; font-weight: 600; }
+        
+        /* key badges are the style for displaying column names (small teal oval with blue text) */
         .key-badge { display: inline-block; background: #e6fefa; color: #0066cc; padding: 3px 8px; border-radius: 12px; margin: 3px; font-size: 12px; font-family:  monospace;}
     </style>
-    <!-- Google tag (gtag.js) -->
+    
+    <!-- Google tag (gtag.js) this is for google analytics-->
         <script async src="https://www.googletagmanager.com/gtag/js?id=G-RG0HGB4VV2"></script>
         <script>
             window.dataLayer = window.dataLayer || [];
@@ -33,9 +44,11 @@
 <h2> JSON & JSONL to SQL Tool</h2>
 
 
-<p style="color: #666;">Paste raw JSON/JSONL text or upload a file to query it natively using standard SQL table naming.</p> 
+<p style= "color: #666;">Paste raw JSON/JSONL text or upload a file to query it natively using standard SQL table naming.</p> 
 <div class="card">
     <label style="font-weight: bold;">1. Input JSON / JSONL Data</label><br><br>
+
+    <!-- this input is the "choose file" button that allows json upload -->
     <input type="file" id="filePicker" accept=".json,.jsonl" style="margin-bottom: 10px; "> <br>
     <textarea id="jsonInput" placeholder="Paste raw array, object dictionary, on JSONLrows here..."></textarea>
     <button onclick="processJSON()" style="margin-top: 10px;">Parse & Register Table</button>
@@ -77,13 +90,36 @@
             // STRATEGY: First try parsing as standard JSON
             try {
                 let data = JSON.parse(rawText);
-                
-                // Handle custom dictionary/nested structures if present
-                if (data.featureInfo && typeof data.featureInfo === 'object' && !Array.isArray(data.featureInfo)) {
-                    parsedRows = Object.values(data.featureInfo);
-                } else {
-                    parsedRows = Array.isArray(data) ? data : [data];
+            
+                if (Array.isArray(data)) {
+                    parsedRows = data;
+                } else if (data && typeof data === 'object') {
+                    // Find a nested dict-of-records (structure-based, not name-based)
+                    let candidateKey = Object.keys(data).find(k => {
+                        const v = data[k];
+                        return v && typeof v === 'object' && !Array.isArray(v) &&
+                            Object.keys(v).length > 0 &&
+                            Object.values(v).every(item => item && typeof item === 'object' && !Array.isArray(item));
+                    });
+
+                    if (candidateKey) {
+                        // Everything else at the top level becomes "shared" columns,
+                        // merged into every inner row.
+                        let outerFields = {};
+                        Object.keys(data).forEach(k => {
+                            if (k !== candidateKey) outerFields[k] = data[k];
+                        });
+
+                        parsedRows = Object.values(data[candidateKey]).map(innerRow => ({
+                            ...outerFields,
+                            ...innerRow
+                        }));
+                    } else {
+                        parsedRows = [data];
+                    }
                 }
+
+
             } catch (jsonErr) {
                 // FALLBACK: If standard JSON fails, try parsing as JSON Lines (JSONL)
                 parsedRows = rawText.split('\n')
@@ -115,11 +151,12 @@
             });
 
             // Set query default
-            if (keys.has('srcCounterName')) {
-                document.getElementById('sqlInput').value = "SELECT srcCounterName, coefficient \nFROM data \nORDER BY ABS(coefficient) DESC";
-            } else {
-                document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
-            }
+            // if (keys.has('srcCounterName')) {
+            //     document.getElementById('sqlInput').value = "SELECT srcCounterName, coefficient \nFROM data \nORDER BY ABS(coefficient) DESC";
+            // } else {
+            //     document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
+            // }
+            document.getElementById('sqlInput').value = "SELECT * \nFROM data \nWHERE 1=1";
 
             alert(`Successfully registered table 'data' with ${parsedRows.length} rows!`); 
 
