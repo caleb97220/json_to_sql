@@ -89,6 +89,113 @@
     <div style="overflow-x: auto;" id="tableOutput">No query executed yet.</div>
     </div>
 
+<div class="card" style="margin-top: 20px;">
+    <h3 style="margin-top:0;">About This Tool</h3>
+    <p>
+        This free browser-based tool lets you query JSON and JSONL files using standard SQL syntax —
+        no database setup, no server, no upload required. Paste your data or select a file, and it's
+        instantly registered as a queryable table called <code>data</code>. Run SELECT statements with
+        WHERE clauses, ORDER BY, aggregate functions, and more, directly against your JSON structure.
+        Everything runs client-side in your browser, so your data never leaves your device.
+    </p>
+
+    <h3>Frequently Asked Questions</h3>
+
+    <p><strong>Can I query a JSONL (JSON Lines) file with SQL?</strong><br>
+    Yes. Paste JSONL content (one JSON object per line) directly into the input box, or upload a
+    .jsonl file. The tool automatically detects JSONL format and parses each line as a row.</p>
+
+    <p><strong>Do I need to write CREATE TABLE statements first?</strong><br>
+    No. As soon as you parse your JSON or JSONL data, it's automatically registered as a table named
+    <code>data</code>. You can start writing SELECT queries against it immediately.</p>
+
+    <p><strong>Is my JSON data uploaded to a server?</strong><br>
+    No. All parsing and querying happens locally in your browser using client-side JavaScript. Your
+    data is never sent to a server or stored anywhere outside your own browser session.</p>
+
+    <p><strong>What SQL features are supported?</strong><br>
+    This tool uses AlaSQL, an in-browser SQL engine, which supports standard SELECT statements,
+    WHERE filtering, ORDER BY, GROUP BY, JOINs, and common aggregate functions like COUNT, SUM, and AVG.</p>
+
+    <p><strong>Can I export my query results?</strong><br>
+    Yes. After running a query, click "Download CSV" to save your results as a CSV file you can open
+    in Excel, Google Sheets, or any spreadsheet application.</p>
+
+    <p><strong>What if my JSON has nested objects?</strong><br>
+    If your top-level JSON is an object containing a nested collection of records (rather than a flat
+    array), the tool automatically detects this structure and uses the nested records as your table
+    rows, merging in any top-level fields as shared columns.</p>
+
+    <p><strong>Does this work with large files?</strong><br>
+    Since everything runs in your browser's memory, performance depends on your device and browser.
+    It comfortably handles typical JSON/JSONL files used for configs, logs, exports, and API responses.</p>
+</div>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can I query a JSONL (JSON Lines) file with SQL?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Paste JSONL content (one JSON object per line) directly into the input box, or upload a .jsonl file. The tool automatically detects JSONL format and parses each line as a row."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to write CREATE TABLE statements first?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. As soon as you parse your JSON or JSONL data, it's automatically registered as a table named data. You can start writing SELECT queries against it immediately."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is my JSON data uploaded to a server?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. All parsing and querying happens locally in your browser using client-side JavaScript. Your data is never sent to a server or stored anywhere outside your own browser session."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What SQL features are supported?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "This tool uses AlaSQL, an in-browser SQL engine, which supports standard SELECT statements, WHERE filtering, ORDER BY, GROUP BY, JOINs, and common aggregate functions like COUNT, SUM, and AVG."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I export my query results?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. After running a query, click Download CSV to save your results as a CSV file you can open in Excel, Google Sheets, or any spreadsheet application."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What if my JSON has nested objects?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "If your top-level JSON is an object containing a nested collection of records rather than a flat array, the tool automatically detects this structure and uses the nested records as your table rows, merging in any top-level fields as shared columns."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does this work with large files?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Since everything runs in your browser's memory, performance depends on your device and browser. It comfortably handles typical JSON/JSONL files used for configs, logs, exports, and API responses."
+      }
+    }
+  ]
+}
+</script>
+
 <script>
     // Parse JSON/JSONL and bind it directly to an in-memory table named "data'
     function processJSON() {
