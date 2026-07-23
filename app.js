@@ -105,17 +105,24 @@
             lastResult = result;
             renderTable(result);
             document.getElementById('downloadBtn').style.display = result.length ? 'inline-block' : 'none';
-
+            gtag('event', 'query_success', {
+                        row_count: result.length
+                    });
         } catch (err) {
             document.getElementById("tableOutput").innerHTML = `<span style="color: red; font-weight: bold;">SQL Error: ${err.message}</span>`;
         lastResult = null;
         document.getElementById('downloadBtn').style.display = 'none';
+        gtag('event', 'query_error', {
+            error_message: err.message
+        });
         }
     }
 
     function downloadCSV() {
         if (!lastResult || lastResult.length === 0) return;
-
+        gtag('event', 'csv_download', {
+                row_count: lastResult.length
+            });
         const headerSet = new Set();
         lastResult.forEach(row => {
             Object.keys(row).forEach(key => headerSet.add(key));
@@ -175,18 +182,12 @@
         html += `</tbody></table>`;
         container.innerHTML = html; }
 
-        // function showToast(message, type = 'success', duration = 4000) {
-        //     const container = document.getElementById('toastContainer');
-        //     const toast = document.createElement('div');
-        //     toast.className = `toast ${type}`;
-        //     toast.textContent = message;
-        //     container.appendChild(toast);
-        //     setTimeout(() => toast.remove(), duration);
-        // }
-
-
         // Handle File Pickers
         document.getElementById('filePicker').addEventListener('change', function(e) {
+            if (!file) return;
+            gtag('event', 'file_upload', {
+                file_extension: file.name.split('.').pop()
+            });
             const reader = new FileReader ();
             reader.onload = function(event) {
             document.getElementById('jsonInput').value = event.target.result;
