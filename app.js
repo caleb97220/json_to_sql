@@ -92,6 +92,13 @@
 
 
     let lastResult = null;
+
+    // Analytics should be optional: content blockers must not interrupt local queries.
+    function trackEvent(name, parameters) {
+        if (typeof window.gtag === 'function') {
+            window.gtag('event', name, parameters);
+        }
+    }
     // Run the custom query string written by the user
     function runQuery() {
         if (!alasql.tables.data) {
@@ -105,14 +112,14 @@
             lastResult = result;
             renderTable(result);
             document.getElementById('downloadBtn').style.display = result.length ? 'inline-block' : 'none';
-            gtag('event', 'query_success', {
+            trackEvent('query_success', {
                         row_count: result.length
                     });
         } catch (err) {
             document.getElementById("tableOutput").innerHTML = `<span style="color: red; font-weight: bold;">SQL Error: ${err.message}</span>`;
         lastResult = null;
         document.getElementById('downloadBtn').style.display = 'none';
-        gtag('event', 'query_error', {
+        trackEvent('query_error', {
             error_message: err.message
         });
         }
@@ -120,7 +127,7 @@
 
     function downloadCSV() {
         if (!lastResult || lastResult.length === 0) return;
-        gtag('event', 'csv_download', {
+        trackEvent('csv_download', {
                 row_count: lastResult.length
             });
         const headerSet = new Set();
@@ -184,8 +191,9 @@
 
         // Handle File Pickers
         document.getElementById('filePicker').addEventListener('change', function(e) {
+            const file = e.target.files[0];
             if (!file) return;
-            gtag('event', 'file_upload', {
+            trackEvent('file_upload', {
                 file_extension: file.name.split('.').pop()
             });
             const reader = new FileReader ();
@@ -194,5 +202,5 @@
             processJSON();
         };
 
-    reader.readAsText(e.target.files[0]);
+    reader.readAsText(file);
     });
